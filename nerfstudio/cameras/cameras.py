@@ -731,8 +731,6 @@ class Cameras(TensorDataclass):
                         distortion_params[mask, :],
                     ).reshape(-1, 2)
 
-                    
-
         # Switch from OpenCV to OpenGL
         coord_stack[..., 1] *= -1
 

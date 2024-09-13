@@ -348,6 +348,14 @@ class Cameras(TensorDataclass):
         # times: Optional[Float[Tensor, "num_cameras 1"]]
         # metadata: Optional[Dict]
 
+        if not self.shape:
+            cameras = self.reshape((1,))
+            assert torch.all(
+                torch.tensor(camera_indices == 0) if isinstance(camera_indices, int) else camera_indices == 0
+            ), "Can only index into single camera with no batch dimensions if index is zero"
+        else:
+            cameras = self
+
         # assume single perspective camera with no distortion
 
         # points are points in 3D
@@ -358,7 +366,7 @@ class Cameras(TensorDataclass):
 
         true_indices = [camera_indices[..., i] for i in range(camera_indices.shape[-1])]
 
-        c2w = self.camera_to_worlds[true_indices]
+        c2w = cameras.camera_to_worlds[true_indices]
         assert c2w.shape == num_rays_shape + (3, 4)
 
         if camera_opt_to_camera is not None:
@@ -369,28 +377,24 @@ class Cameras(TensorDataclass):
         translation = c2w[..., :3, 3]  # (..., 3)
         assert translation.shape == num_rays_shape + (3,)
 
-        local_points = (world_points - translation.unsqueeze(-2)) @ rotation.transpose(-1, -2)  # (..., num_points, 3)
-
-        fx = self.fx[true_indices].unsqueeze(-1)
-        fy = self.fy[true_indices].unsqueeze(-1)
-        cx = self.cx[true_indices].unsqueeze(-1)
-        cy = self.cy[true_indices].unsqueeze(-1)
-        assert fx.shape == num_rays_shape + (1,)
-        assert fy.shape == num_rays_shape + (1,)
-        assert cx.shape == num_rays_shape + (1,)
-        assert cy.shape == num_rays_shape + (1,)
+        local_points = rotation.transpose(-1, -2) @ (world_points - translation).unsqueeze(-1)  # (..., num_points, 3)
+        local_points = local_points.squeeze(-1)
+        local_points[..., 0] *= -1  # OpenGL to OpenCV
+        
+        fx, fy = self.fx[true_indices].squeeze(-1), self.fy[true_indices].squeeze(-1)  # (num_rays,)
+        cx, cy = self.cx[true_indices].squeeze(-1), self.cy[true_indices].squeeze(-1)  # (num_rays,)
+        assert fx.shape == num_rays_shape
+        assert fy.shape == num_rays_shape
+        assert cx.shape == num_rays_shape
+        assert cy.shape == num_rays_shape
 
         x = local_points[..., 0] / local_points[..., 2]
         y = local_points[..., 1] / local_points[..., 2]
-        assert x.shape == num_rays_shape + (points.shape[-2],)
-        assert y.shape == num_rays_shape + (points.shape[-2],)
 
         u = fx * x + cx
         v = fy * y + cy
-        assert u.shape == num_rays_shape + (points.shape[-2],)
-        assert v.shape == num_rays_shape + (points.shape[-2],)
 
-        return torch.stack([u, v], dim=-1)
+        return torch.stack([v, u], dim=-1)
 
 
     def generate_rays(

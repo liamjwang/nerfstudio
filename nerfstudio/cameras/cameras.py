@@ -318,6 +318,81 @@ class Cameras(TensorDataclass):
             image_coords = torch.stack(image_coords, dim=-1) + pixel_offset  # stored as (y, x) coordinates
         return image_coords
 
+    def points_to_coords(
+        self,
+        camera_indices: Int[Tensor, "*num_points num_cameras_batch_dims"],
+        points: Float[Tensor, "*num_points 3"],
+        camera_opt_to_camera: Optional[Float[Tensor, "*num_points 3 4"]] = None,
+        distortion_params_delta: Optional[Float[Tensor, "*num_points 6"]] = None,
+        keep_shape: Optional[bool] = None,
+        disable_distortion: bool = False,
+    ):
+        if camera_opt_to_camera is not None:
+            raise NotImplementedError("camera_opt_to_camera is not implemented yet.")
+        if distortion_params_delta is not None:
+            raise NotImplementedError("distortion_params_delta is not implemented yet.")
+        if keep_shape is not None:
+            raise NotImplementedError("keep_shape is not implemented yet.")
+        if disable_distortion:
+            raise NotImplementedError("disable_distortion is not implemented yet.")
+        
+        # camera_to_worlds: Float[Tensor, "*num_cameras 3 4"]
+        # fx: Float[Tensor, "*num_cameras 1"]
+        # fy: Float[Tensor, "*num_cameras 1"]
+        # cx: Float[Tensor, "*num_cameras 1"]
+        # cy: Float[Tensor, "*num_cameras 1"]
+        # width: Shaped[Tensor, "*num_cameras 1"]
+        # height: Shaped[Tensor, "*num_cameras 1"]
+        # distortion_params: Optional[Float[Tensor, "*num_cameras 6"]]
+        # camera_type: Int[Tensor, "*num_cameras 1"]
+        # times: Optional[Float[Tensor, "num_cameras 1"]]
+        # metadata: Optional[Dict]
+
+        # assume single perspective camera with no distortion
+
+        # points are points in 3D
+
+        world_points = points
+
+        num_rays_shape = camera_indices.shape[:-1]
+
+        true_indices = [camera_indices[..., i] for i in range(camera_indices.shape[-1])]
+
+        c2w = self.camera_to_worlds[true_indices]
+        assert c2w.shape == num_rays_shape + (3, 4)
+
+        if camera_opt_to_camera is not None:
+            c2w = pose_utils.multiply(c2w, camera_opt_to_camera)
+        rotation = c2w[..., :3, :3]  # (..., 3, 3)
+        assert rotation.shape == num_rays_shape + (3, 3)
+
+        translation = c2w[..., :3, 3]  # (..., 3)
+        assert translation.shape == num_rays_shape + (3,)
+
+        local_points = (world_points - translation.unsqueeze(-2)) @ rotation.transpose(-1, -2)  # (..., num_points, 3)
+
+        fx = self.fx[true_indices].unsqueeze(-1)
+        fy = self.fy[true_indices].unsqueeze(-1)
+        cx = self.cx[true_indices].unsqueeze(-1)
+        cy = self.cy[true_indices].unsqueeze(-1)
+        assert fx.shape == num_rays_shape + (1,)
+        assert fy.shape == num_rays_shape + (1,)
+        assert cx.shape == num_rays_shape + (1,)
+        assert cy.shape == num_rays_shape + (1,)
+
+        x = local_points[..., 0] / local_points[..., 2]
+        y = local_points[..., 1] / local_points[..., 2]
+        assert x.shape == num_rays_shape + (points.shape[-2],)
+        assert y.shape == num_rays_shape + (points.shape[-2],)
+
+        u = fx * x + cx
+        v = fy * y + cy
+        assert u.shape == num_rays_shape + (points.shape[-2],)
+        assert v.shape == num_rays_shape + (points.shape[-2],)
+
+        return torch.stack([u, v], dim=-1)
+
+
     def generate_rays(
         self,
         camera_indices: Union[Int[Tensor, "*num_rays num_cameras_batch_dims"], int],

@@ -123,4 +123,9 @@
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.diagnosticMode": "workspace",
   "eslint.packageManager": "yarn",
+  "workbench.colorCustomizations": {
+    "activityBar.background": "#3A292F",
+    "titleBar.activeBackground": "#523941",
+    "titleBar.activeForeground": "#FBFAFA"
+  },
 }

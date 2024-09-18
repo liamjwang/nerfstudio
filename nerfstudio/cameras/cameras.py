@@ -995,8 +995,8 @@ class Cameras(TensorDataclass):
             metadata = {"directions_norm": directions_norm[0].detach()}
 
         return RayBundle(
-            origins=origins,
-            directions=directions,
+            origins=origins.float(),
+            directions=directions.float(),
             pixel_area=pixel_area,
             camera_indices=camera_indices,
             times=times,

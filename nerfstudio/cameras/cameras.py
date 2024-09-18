@@ -394,7 +394,8 @@ class Cameras(TensorDataclass):
         u = fx * x + cx
         v = fy * y + cy
 
-        return torch.stack([v, u], dim=-1)
+        # NOTE: this function returns XYZ, while generate_rays coords requests YX
+        return torch.stack([u, v, local_points[..., 2]], dim=-1)
 
 
     def generate_rays(

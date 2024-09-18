@@ -95,16 +95,16 @@ class SpacedSampler(Sampler):
 
         num_samples = num_samples or self.num_samples
         assert num_samples is not None
-        num_rays = ray_bundle.origins.shape[0]
+        num_rays = ray_bundle.origins.shape[:-1]
 
         bins = torch.linspace(0.0, 1.0, num_samples + 1).to(ray_bundle.origins.device)[None, ...]  # [1, num_samples+1]
 
         # TODO More complicated than it needs to be.
         if self.train_stratified and self.training:
             if self.single_jitter:
-                t_rand = torch.rand((num_rays, 1), dtype=bins.dtype, device=bins.device)
+                t_rand = torch.rand((*num_rays, 1), dtype=bins.dtype, device=bins.device)
             else:
-                t_rand = torch.rand((num_rays, num_samples + 1), dtype=bins.dtype, device=bins.device)
+                t_rand = torch.rand((*num_rays, num_samples + 1), dtype=bins.dtype, device=bins.device)
             bin_centers = (bins[..., 1:] + bins[..., :-1]) / 2.0
             bin_upper = torch.cat([bin_centers, bins[..., -1:]], -1)
             bin_lower = torch.cat([bins[..., :1], bin_centers], -1)

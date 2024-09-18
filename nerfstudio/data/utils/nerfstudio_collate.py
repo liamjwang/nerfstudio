@@ -212,4 +212,5 @@ def nerfstudio_collate(batch: Any, extra_mappings: Union[Dict[type, Callable], N
         if isinstance(elem, type_key):
             return extra_mappings[type_key](batch)
 
-    raise TypeError(NERFSTUDIO_COLLATE_ERR_MSG_FORMAT.format(elem_type))
+    # raise TypeError(NERFSTUDIO_COLLATE_ERR_MSG_FORMAT.format(elem_type))
+    raise TypeError(elem_type)

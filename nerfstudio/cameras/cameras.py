@@ -99,7 +99,7 @@ class Cameras(TensorDataclass):
     height: Shaped[Tensor, "*num_cameras 1"]
     distortion_params: Optional[Float[Tensor, "*num_cameras 6"]]
     camera_type: Int[Tensor, "*num_cameras 1"]
-    times: Optional[Float[Tensor, "num_cameras 1"]]
+    times: Optional[Float[Tensor, "*num_cameras 1"]]
     metadata: Optional[Dict]
 
     def __init__(
@@ -571,8 +571,8 @@ class Cameras(TensorDataclass):
                 else:
                     assert False
 
-                t_min = t_min.reshape([shape[0], shape[1], 1])
-                t_max = t_max.reshape([shape[0], shape[1], 1])
+                t_min = t_min.reshape([*shape[:-1], 1])
+                t_max = t_max.reshape([*shape[:-1], 1])
 
                 raybundle.nears = t_min
                 raybundle.fars = t_max

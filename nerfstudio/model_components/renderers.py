@@ -327,9 +327,10 @@ class DepthRenderer(nn.Module):
         method: Depth calculation method.
     """
 
-    def __init__(self, method: Literal["median", "expected"] = "median") -> None:
+    def __init__(self, method: Literal["median", "expected"] = "median", threshold=0.5) -> None:
         super().__init__()
         self.method = method
+        self.threshold = threshold
 
     def forward(
         self,
@@ -337,6 +338,7 @@ class DepthRenderer(nn.Module):
         ray_samples: RaySamples,
         ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
         num_rays: Optional[int] = None,
+        bg_value: Optional[float] = None,
     ) -> Float[Tensor, "*batch 1"]:
         """Composite samples along ray and calculate depths.
 
@@ -356,12 +358,16 @@ class DepthRenderer(nn.Module):
             if ray_indices is not None and num_rays is not None:
                 raise NotImplementedError("Median depth calculation is not implemented for packed samples.")
             cumulative_weights = torch.cumsum(weights[..., 0], dim=-1)  # [..., num_samples]
-            split = torch.ones((*weights.shape[:-2], 1), device=weights.device) * 0.5  # [..., 1]
+            split = torch.ones((*weights.shape[:-2], 1), device=weights.device) * self.threshold  # [..., 1]
             median_index = torch.searchsorted(cumulative_weights, split, side="left")  # [..., 1]
             median_index = torch.clamp(median_index, 0, steps.shape[-2] - 1)  # [..., 1]
             median_depth = torch.gather(steps[..., 0], dim=-1, index=median_index)  # [..., 1]
+            if bg_value is not None:
+                median_depth = torch.where(median_index == cumulative_weights.shape[-1]-1, torch.tensor(bg_value, device=weights.device), median_depth)
             return median_depth
         if self.method == "expected":
+            if bg_value is not None:
+                raise NotImplementedError("Background value is not implemented for expected depth calculation.")
             eps = 1e-10
             steps = (ray_samples.frustums.starts + ray_samples.frustums.ends) / 2
 
